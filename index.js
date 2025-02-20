@@ -1,98 +1,68 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const { resolve } = require('path');
-const User = require('./schema'); // Import the User model
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const User = require('./schema');
+const dotenv = require('dotenv');
 
 const app = express();
 const port = 3010;
 
-// MongoDB Connection
-mongoose.connect('mongodb://127.0.0.1:27017/blogDB')
-  .then(async () => {
-    console.log('Connected to MongoDB');
-
-    // ✅ Delete the first user (eswar) automatically on startup
-    const firstUser = await User.findOne().sort({ createdAt: 1 }); // Get the oldest user
-    if (firstUser && firstUser.username !== 'hasini123') {
-      await User.findByIdAndDelete(firstUser._id);
-      console.log(`Deleted user: ${firstUser.username}`);
-    }
-  })
-  .catch(err => console.error('MongoDB connection error:', err));
-
 app.use(express.static('static'));
-app.use(express.json()); // Middleware to parse JSON request body
+app.use(express.json()); 
 
-// Serve Homepage
+
+
+
+dotenv.config();
+mongoose.connect( 'mongodb://127.0.0.1:27017/blogDB')
+    .then(() => console.log('MongoDB connected...'))
+    .catch(err => console.log(err));
+
+
 app.get('/', (req, res) => {
   res.sendFile(resolve(__dirname, 'pages/index.html'));
 });
 
-// ✅ Add a Sample User (Only if  doesn't exist)
-app.get('/add-user', async (req, res) => {
+app.post('/register', async (req, res) => {
   try {
-    const existingUser = await User.findOne({ username: 'eswar123' });
-    if (existingUser) return res.status(400).send('User already exists');
+    const { username, email, password, roles, firstName, lastName, age } = req.body;
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email already in use' });
+    }
+
+    // Hash password before storing
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new User({
-      username: 'eswar123',
-      email: 'eswar@example.com',
-      password: 'securepassword',
-      roles: ['admin'],
-      profile: { firstName: 'eswar', lastName: 'e', age: 25 }
+      username,
+      email,
+      password: hashedPassword, // Store hashed password
+      roles: roles || ['user'], // Default role is 'user'
+      profile: { firstName, lastName, age },
     });
 
     await newUser.save();
-    res.send('User added successfully!');
-  } catch (error) {
-    res.status(500).send('Error adding user: ' + error.message);
+    res.status(201).json({ message: 'User registered successfully', user: newUser });
+  } catch (err) {
+    console.error('Error registering user:', err);
+    res.status(400).json({ error: err.message });
   }
 });
 
-// ✅ List All Users
 app.get('/users', async (req, res) => {
   try {
-    const users = await User.find();
+    const users = await User.find().select('-password'); // Exclude password from response
     res.json(users);
-  } catch (error) {
-    res.status(500).send('Error fetching users: ' + error.message);
+  } catch (err) {
+    console.error('Error fetching users:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
-// ✅ Find User by ID
-app.get('/users/:id', async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).send('User not found');
-    res.json(user);
-  } catch (error) {
-    res.status(500).send('Error fetching user: ' + error.message);
-  }
-});
-
-// ✅ Update User by ID
-app.put('/users/:id', async (req, res) => {
-  try {
-    const updatedUser = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!updatedUser) return res.status(404).send('User not found');
-    res.json(updatedUser);
-  } catch (error) {
-    res.status(500).send('Error updating user: ' + error.message);
-  }
-});
-
-// ✅ Delete User by ID
-app.delete('/users/:id', async (req, res) => {
-  try {
-    const deletedUser = await User.findByIdAndDelete(req.params.id);
-    if (!deletedUser) return res.status(404).send('User not found');
-    res.send('User deleted successfully');
-  } catch (error) {
-    res.status(500).send('Error deleting user: ' + error.message);
-  }
-});
-
-// Start the Server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });

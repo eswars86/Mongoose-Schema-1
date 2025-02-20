@@ -4,44 +4,31 @@ const UserSchema = new mongoose.Schema({
   username: {
     type: String,
     required: true,
-    unique: true,
-    trim: true
   },
   email: {
     type: String,
     required: true,
     unique: true,
-    trim: true,
-    lowercase: true
   },
   password: {
     type: String,
-    required: true
+    required: true,
   },
   roles: {
-    type: [String],
-    default: ['user']
+    type: [String], 
+    default: ['user'],
   },
   profile: {
-    firstName: {
-      type: String,
-      trim: true
-    },
-    lastName: {
-      type: String,
-      trim: true
-    },
-    age: {
-      type: Number,
-      min: 0
-    }
+    firstName: { type: String },
+    lastName: { type: String },
+    age: { type: Number },
   },
   lastLogin: {
     type: Date,
-    default: null
-  }
-}, { timestamps: true });
+    default: Date.now,
+  },
+});
 
+// Create and export the User model
 const User = mongoose.model('User', UserSchema);
-
-module.exports = User;
+module.exports = User;
